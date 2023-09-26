@@ -30,17 +30,7 @@ class Probe:
 
     def __init__(self, channel_map, num_shanks, chan_per_shank, basepath=None, probe_type="neuronexus", probe_name=None, save=False, probe_connector="H32"):
         """
-        Initializes a new instance of the ProbeMapper class.
-
-        Args:
-            channel_map (list): A list of integers representing the desired channel layout of the probe.
-            basepath (str): The basepath for saving the device map file.
-            probe_type (str): The type of the probe being used.
-            probe_name (str): The name of the specific probe model being used.
-            num_shanks (int): The number of shanks in the probe.
-            chan_per_shank (list): List of number of channels per shank in the order of shanks
-            save (bool): A flag indicating whether to save the device map file.
-            probe_connector (str): The type of connector used by the probe.
+        Initializes a new instance of the Probe class.
         """
         self.channel_map = channel_map
         self.basepath = basepath
