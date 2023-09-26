@@ -4,6 +4,7 @@ class Probe:
 
     Attributes:
         channel_map (list): A list of integers representing the channel indices of the probe from dorsal to ventral and left to right shanks.
+        chan_per_shank(list): List of number of channels per shank in the order of shanks
         basepath (str): The basepath for saving the device map file.
         probe_type (str): The type of the probe being used.
         probe_name (str): The name of the specific probe model being used.
@@ -27,7 +28,7 @@ class Probe:
         Author: @Praveen Paudel, 2023
     """
 
-    def __init__(self, channel_map, basepath=None, probe_type="neuronexus", probe_name=None, num_shanks=1, save=False, probe_connector="H32"):
+    def __init__(self, channel_map, num_shanks, chan_per_shank, basepath=None, probe_type="neuronexus", probe_name=None, save=False, probe_connector="H32"):
         """
         Initializes a new instance of the ProbeMapper class.
 
@@ -37,6 +38,7 @@ class Probe:
             probe_type (str): The type of the probe being used.
             probe_name (str): The name of the specific probe model being used.
             num_shanks (int): The number of shanks in the probe.
+            chan_per_shank (list): List of number of channels per shank in the order of shanks
             save (bool): A flag indicating whether to save the device map file.
             probe_connector (str): The type of connector used by the probe.
         """
@@ -47,6 +49,7 @@ class Probe:
         self.num_shanks = num_shanks
         self.save = save
         self.probe_connector = probe_connector
+        self.chan_per_shank = chan_per_shank
 
         # Define the layout of the 32-channel Intan headstage
         self.intan32ch_preamp = [
@@ -103,32 +106,33 @@ class Probe:
         if self.save:
             # Save the device map file for the regular version
             with open(f'{self.basepath}/{self.probe_type}_{self.probe_name}_version1.txt', 'w') as f:
+                start = 0
                 for i in range(self.num_shanks):
-                    start = i * 8
-                    end = start + 8
+                    end = start + self.chan_per_shank[i]
                     f.write('shank{}: '.format(i+1))
                     f.write(' '.join([str(j) for j in device_channel_indices1[start:end]]) + '\n')
-
+                    start = end 
 
             # Save the device map file for the flipped version
             with open(f'{self.basepath}/{self.probe_type}_{self.probe_name}_version2.txt', 'w') as f:
+                start = 0
                 for i in range(self.num_shanks):
-                    start = i * 8
-                    end = start + 8
+                    end = start + self.chan_per_shank[i]
                     f.write('shank{}: '.format(i+1))
                     f.write(' '.join([str(j) for j in device_channel_indices2[start:end]]) + '\n')
-
+                    start = end 
+        
         # Return the device map as a string
         device_map = f"Contents of {self.probe_type}_{self.probe_name}_version1.txt:\n"
         for i in range(self.num_shanks):
-            start = i * 8
-            end = start + 8
+            start = sum(self.chan_per_shank[:i])
+            end = start + self.chan_per_shank[i]
             device_map += f"shank{i+1}: {' '.join([str(j) for j in device_channel_indices1[start:end]])}\n"
 
         device_map += f"\nContents of {self.probe_type}_{self.probe_name}_version2.txt:\n"
         for i in range(self.num_shanks):
-            start = i * 8
-            end = start + 8
+            start = sum(self.chan_per_shank[:i])
+            end = start + self.chan_per_shank[i]
             device_map += f"shank{i+1}: {' '.join([str(j) for j in device_channel_indices2[start:end]])}\n"
 
         print(device_map, end=" ")
@@ -150,32 +154,34 @@ class Probe:
         if self.save:
             # Save the device map file for the regular version
             with open(f'{self.basepath}/{self.probe_type}_{self.probe_name}_version1.txt', 'w') as f:
+                start = 0
                 for i in range(self.num_shanks):
-                    start = i * 8
-                    end = start + 8
+                    end = start + self.chan_per_shank[i]
                     f.write('shank{}: '.format(i+1))
                     f.write(' '.join([str(j) for j in device_channel_indices1[start:end]]) + '\n')
+                    start = end 
 
 
             # Save the device map file for the flipped version
             with open(f'{self.basepath}/{self.probe_type}_{self.probe_name}_version2.txt', 'w') as f:
+                start = 0
                 for i in range(self.num_shanks):
-                    start = i * 8
-                    end = start + 8
+                    end = start + self.chan_per_shank[i]
                     f.write('shank{}: '.format(i+1))
                     f.write(' '.join([str(j) for j in device_channel_indices2[start:end]]) + '\n')
+                    start = end 
 
         # Return the device map as a string
         device_map = f"Contents of {self.probe_type}_{self.probe_name}_version1.txt:\n"
         for i in range(self.num_shanks):
-            start = i * 8
-            end = start + 8
+            start = sum(self.chan_per_shank[:i])
+            end = start + self.chan_per_shank[i]
             device_map += f"shank{i+1}: {' '.join([str(j) for j in device_channel_indices1[start:end]])}\n"
 
         device_map += f"\nContents of {self.probe_type}_{self.probe_name}_version2.txt:\n"
         for i in range(self.num_shanks):
-            start = i * 8
-            end = start + 8
+            start = sum(self.chan_per_shank[:i])
+            end = start + self.chan_per_shank[i]
             device_map += f"shank{i+1}: {' '.join([str(j) for j in device_channel_indices2[start:end]])}\n"
 
         print(device_map, end=" ")
@@ -217,5 +223,6 @@ class Probe:
 
         Returns:
             A list of integers representing the mapped channel indices of the Intan headstage.
-        """
+"""                        
         return [intan_preamp[probe_index[channel_map[i]]] for i in range(len(channel_map))]
+
