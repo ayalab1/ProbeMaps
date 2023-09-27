@@ -20,7 +20,7 @@ class Probe:
     Example usage:
         Create an instance of the ProbeMapper class with the channel map and other arguments
         channel_map = [1, 8, 2, 7, 3, 6, 4, 5, 9, 16, 10, 15, 11, 14, 12, 13, 17, 24, 18, 23, 19, 22, 20, 21, 25, 32, 26, 31, 27, 30, 28, 29]
-        probe_mapper = Probe(channel_map, basepath=r"C:\GitHub\LiddellFieldProject\docs\probes_channel_maps", probe_type="neuronexus", probe_name="xyz model", num_shanks=2, save=True, probe_connector="H64")
+        probe = Probe(channel_map, basepath=r"C:\GitHub\LiddellFieldProject\docs\probes_channel_maps", probe_type="neuronexus", probe_name="xyz model", num_shanks=2, save=True, probe_connector="H64")
 
         Call the method to get the mapped channel indices
         probe_mapper.probeOmnetics2_intan32ch()
@@ -28,7 +28,18 @@ class Probe:
         Author: @Praveen Paudel, 2023
     """
 
-    def __init__(self, channel_map, num_shanks, chan_per_shank, basepath=None, probe_type="neuronexus", probe_name=None, save=False, probe_connector="H32"):
+    def __init__(
+            self, 
+            *, 
+            channel_map, 
+            num_shanks, 
+            chan_per_shank, 
+            basepath=None, 
+            probe_type="neuronexus", 
+            probe_name,
+            save=False, 
+            probe_connector="H32"
+            ):
         """
         Initializes a new instance of the Probe class.
         """
@@ -213,6 +224,6 @@ class Probe:
 
         Returns:
             A list of integers representing the mapped channel indices of the Intan headstage.
-"""                        
+        """                        
         return [intan_preamp[probe_index[channel_map[i]]] for i in range(len(channel_map))]
 
