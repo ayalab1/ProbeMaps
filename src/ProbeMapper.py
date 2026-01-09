@@ -1,229 +1,212 @@
-class Probe:
-    """
-    A class for mapping the channel indices of an Omnetics probe to the corresponding channel indices of an Intan headstage.
+"""Passive probe to Intan headstage channel mapping.
 
-    Attributes:
-        channel_map (list): A list of integers representing the channel indices of the probe from dorsal to ventral and left to right shanks.
-        chan_per_shank(list): List of number of channels per shank in the order of shanks
-        basepath (str): The basepath for saving the device map file.
-        probe_type (str): The type of the probe being used.
-        probe_name (str): The name of the specific probe model being used.
-        num_shanks (int): The number of shanks in the probe.
-        save (bool): A flag indicating whether to save the device map file.
-        probe_connector (str): The type of connector used by the probe.
+This module provides an API for converting Omnetics probe
+channel numbering to Intan headstage channel numbering. 
+"""
 
-    Methods:
-        probeOmnetics2_intan32ch: Maps the channel indices of a 32-channel Omnetics probe to the corresponding channel indices of a 32-channel Intan headstage.
-        probeOmnetics2_intan64ch: Maps the channel indices of a 64-channel Omnetics probe to the corresponding channel indices of a 64-channel Intan headstage.
-        get_device_map: Returns the device map as a string.
+from __future__ import annotations
 
-    Example usage:
-        Create an instance of the ProbeMapper class with the channel map and other arguments
-        channel_map = [1, 8, 2, 7, 3, 6, 4, 5, 9, 16, 10, 15, 11, 14, 12, 13, 17, 24, 18, 23, 19, 22, 20, 21, 25, 32, 26, 31, 27, 30, 28, 29]
-        probe = Probe(channel_map, basepath=r"C:\GitHub\LiddellFieldProject\docs\probes_channel_maps", probe_type="neuronexus", probe_name="xyz model", num_shanks=2, save=True, probe_connector="H64")
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Mapping, Sequence
 
-        Call the method to get the mapped channel indices
-        probe_mapper.probeOmnetics2_intan32ch()
 
-        Author: @Praveen Paudel, 2023
-    """
+@dataclass(frozen=True)
+class Layout:
+    """Immutable representation of a connector layout."""
 
-    def __init__(
-            self, 
-            *, 
-            channel_map, 
-            num_shanks, 
-            chan_per_shank, 
-            basepath=None, 
-            probe_type="neuronexus", 
-            probe_name,
-            save=False, 
-            probe_connector="H32"
-            ):
-        """
-        Initializes a new instance of the Probe class.
-        """
-        self.channel_map = channel_map
-        self.basepath = basepath
-        self.probe_type = probe_type
-        self.probe_name = probe_name
-        self.num_shanks = num_shanks
-        self.save = save
-        self.probe_connector = probe_connector
-        self.chan_per_shank = chan_per_shank
+    name: str
+    pins: Sequence[int]
 
-        # Define the layout of the 32-channel Intan headstage
-        self.intan32ch_preamp = [
+    @property
+    def flipped(self) -> List[int]:
+        """Return the reversed layout (useful for flipped headstage orientation)."""
+
+        return list(reversed(self.pins))
+
+
+# Intan headstage layouts (preamp ordering)
+# Add new Intan headstage sizes here: use channel count as key and a Layout with pins
+# ordered per the Intan schematic (dorsal→ventral, left→right as needed).
+INTAN_LAYOUTS: Mapping[int, Layout] = {
+    16: Layout(
+        name="intan16",
+        pins=[11, 10, 9, 8, 7, 6, 5, 4, 12, 13, 14, 15, 0, 1, 2, 3],
+    ),
+    32: Layout(
+        name="intan32",
+        pins=[
             23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8,
-            24, 25, 26, 27, 28, 29, 30, 31, 0, 1, 2, 3, 4, 5, 6, 7
-        ]
-        self.intan32ch_preamp_flipped = self.intan32ch_preamp[::-1]
-
-        # Define the layout of the 64-channel Intan headstage
-        self.intan64ch_preamp = [
+            24, 25, 26, 27, 28, 29, 30, 31, 0, 1, 2, 3, 4, 5, 6, 7,
+        ],
+    ),
+    64: Layout(
+        name="intan64",
+        pins=[
             46, 44, 42, 40, 38, 36, 34, 32, 30, 28, 26, 24, 22, 20, 18, 16,
             47, 45, 43, 41, 39, 37, 35, 33, 31, 29, 27, 25, 23, 21, 19, 17,
             49, 51, 53, 55, 57, 59, 61, 63, 1, 3, 5, 7, 9, 11, 13, 15,
-            48, 50, 52, 54, 56, 58, 60, 62, 0, 2, 4, 6, 8, 10, 12, 14
-        ]
-        self.intan64ch_preamp_flipped = self.intan64ch_preamp[::-1]
+            48, 50, 52, 54, 56, 58, 60, 62, 0, 2, 4, 6, 8, 10, 12, 14,
+        ],
+    ),
+}
 
-        # Define the omnetics connector layout for neuronexus 32 ch probe.
-        # for H32 Connector
-        if probe_type == "neuronexus" and probe_connector == "H32":
-            self.probe32ch_omnetics = [
-                18, 27, 28, 29, 17, 30, 31, 32, 1, 2, 3, 16, 4, 5, 6, 15,
-                20, 21, 22, 23, 19, 24, 25, 26, 7, 8, 9, 14, 10, 11, 12, 13
-            ]
-        else:
-            self.probe32ch_omnetics = []  # Update with new values
 
-        # Define the omnetics connector layout for neuronexus 64 ch probe.
-        # for H64 Connector
-        if probe_type == "neuronexus" and probe_connector == "H64":
-            self.probe64ch_omnetics = [
-                34,43,44,45,33,46,47,48,17,18,19,32,20,21,22,31,
-                42,41,40,35,39,38,37,36,29,28,27,26,30,25,24,23,
-                64,62,60,58,56,54,52,50,15,13,11,9,7,5,3,1,
-                63,61,59,57,55,53,51,49,16,14,12,10,8,6,4,2
-            ]
-        else:
-            self.probe64ch_omnetics = []  # Update with new values
+# Omnetics pinouts for  probe families
+# Add new probes/connectors here: key is (probe_type, connector), value is Layout with
+# Omnetics pin order as printed on the probe datasheet (match the mechanical numbering).
+OMNETICS_LAYOUTS: Mapping[tuple[str, str], Layout] = {
+    ("neuronexus", "H16"): Layout(
+        name="neuronexus_H16",
+        pins=[14, 15, 9, 16, 1, 8, 2, 3, 12, 11, 10, 13, 4, 7, 6, 5],
+    ),
+    ("neuronexus", "H32"): Layout(
+        name="neuronexus_H32",
+        pins=[
+            18, 27, 28, 29, 17, 30, 31, 32, 1, 2, 3, 16, 4, 5, 6, 15,
+            20, 21, 22, 23, 19, 24, 25, 26, 7, 8, 9, 14, 10, 11, 12, 13,
+        ],
+    ),
+    ("neuronexus", "H64"): Layout(
+        name="neuronexus_H64",
+        pins=[
+            34, 43, 44, 45, 33, 46, 47, 48, 17, 18, 19, 32, 20, 21, 22, 31,
+            42, 41, 40, 35, 39, 38, 37, 36, 29, 28, 27, 26, 30, 25, 24, 23,
+            64, 62, 60, 58, 56, 54, 52, 50, 15, 13, 11, 9, 7, 5, 3, 1,
+            63, 61, 59, 57, 55, 53, 51, 49, 16, 14, 12, 10, 8, 6, 4, 2,
+        ],
+    ),
+}
 
-    def probeOmnetics2_intan32ch(self):
-        """
-        Maps the channel indices of a 32-channel Omnetics probe to the corresponding channel indices of a 32-channel Intan headstage.
 
-        Returns:
-            A string representing the device map.
-        """
-        # Create a dictionary that maps each channel on the Omnetics probe to its index
-        probe_index = {value: index for index, value in enumerate(self.probe32ch_omnetics)}
+class ProbeMapper:
+    """Utility for converting Omnetics channel numbering to Intan numbering.
 
-        # Map the channel indices of the Omnetics probe to the corresponding channel indices of the Intan headstage
-        device_channel_indices1 = self.map_channel_indices(self.channel_map, probe_index, self.intan32ch_preamp)
-        device_channel_indices2 = self.map_channel_indices(self.channel_map, probe_index, self.intan32ch_preamp_flipped)
+    Parameters
+    ----------
+    channel_map:
+        Desired ordering of probe channels as they appear on the shanks
+        (dorsal to ventral, left to right). The length must match the chosen
+        connector layout.
+    chan_per_shank:
+        Number of channels per shank, used for shank-wise text outputs.
+    probe_type / probe_connector:
+        Keys into the predefined OMNETICS_LAYOUTS dictionary.
+    probe_name:
+        Identifier used in saved file names.
+    basepath:
+        Directory in which mapping files are written when ``save=True``.
+    save:
+        Persist mapping text files if True.
+    """
+
+    def __init__(
+        self,
+        *,
+        channel_map: Sequence[int],
+        chan_per_shank: Sequence[int],
+        probe_type: str,
+        probe_connector: str,
+        probe_name: str,
+        basepath: str | Path | None = None,
+        save: bool = False,
+        versions: Sequence[str] = ("version1", "version2"),
+    ) -> None:
+        self.channel_map = list(channel_map)
+        self.chan_per_shank = list(chan_per_shank)
+        self.probe_type = probe_type.lower()
+        self.probe_connector = probe_connector.upper()
+        self.probe_name = probe_name
+        self.basepath = Path(basepath) if basepath is not None else Path.cwd()
+        self.save = save
+        self.versions = list(versions)
+
+        self.omnetics_layout = self._require_omnetics_layout()
+        self.intan_layout = self._require_intan_layout()
+        self._validate_lengths()
+        self._validate_versions()
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+    def compute(self) -> None:
+        """Compute regular and flipped mappings, optionally write files, print report."""
+
+        device_channel_indices = self._map_channel_indices(self.intan_layout.pins)
+        flipped_channel_indices = self._map_channel_indices(self.intan_layout.flipped)
+
+        version_a, version_b = self.versions
 
         if self.save:
-            # Save the device map file for the regular version
-            with open(f'{self.basepath}/{self.probe_type}_{self.probe_name}_version1.txt', 'w') as f:
-                start = 0
-                for i in range(self.num_shanks):
-                    end = start + self.chan_per_shank[i]
-                    f.write('shank{}: '.format(i+1))
-                    f.write(' '.join([str(j) for j in device_channel_indices1[start:end]]) + '\n')
-                    start = end 
+            path_a = self._save_mapping(device_channel_indices, suffix=version_a)
+            path_b = self._save_mapping(flipped_channel_indices, suffix=version_b)
+            print(f"Saved: {path_a}")
+            print(f"Saved: {path_b}")
 
-            # Save the device map file for the flipped version
-            with open(f'{self.basepath}/{self.probe_type}_{self.probe_name}_version2.txt', 'w') as f:
-                start = 0
-                for i in range(self.num_shanks):
-                    end = start + self.chan_per_shank[i]
-                    f.write('shank{}: '.format(i+1))
-                    f.write(' '.join([str(j) for j in device_channel_indices2[start:end]]) + '\n')
-                    start = end 
-        
-        # Return the device map as a string
-        device_map = f"Contents of {self.probe_type}_{self.probe_name}_version1.txt:\n"
-        for i in range(self.num_shanks):
-            start = sum(self.chan_per_shank[:i])
-            end = start + self.chan_per_shank[i]
-            device_map += f"shank{i+1}: {' '.join([str(j) for j in device_channel_indices1[start:end]])}\n"
+        print(self._format_report(device_channel_indices, flipped_channel_indices))
 
-        device_map += f"\nContents of {self.probe_type}_{self.probe_name}_version2.txt:\n"
-        for i in range(self.num_shanks):
-            start = sum(self.chan_per_shank[:i])
-            end = start + self.chan_per_shank[i]
-            device_map += f"shank{i+1}: {' '.join([str(j) for j in device_channel_indices2[start:end]])}\n"
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    def _require_omnetics_layout(self) -> Layout:
+        key = (self.probe_type, self.probe_connector)
+        if key not in OMNETICS_LAYOUTS:
+            known = ", ".join(sorted({f"{k[0]}-{k[1]}" for k in OMNETICS_LAYOUTS}))
+            raise ValueError(f"Unsupported probe/connector: {key}. Known: {known}")
+        return OMNETICS_LAYOUTS[key]
 
-        print(device_map, end=" ")
+    def _require_intan_layout(self) -> Layout:
+        pin_count = len(self.omnetics_layout.pins)
+        if pin_count not in INTAN_LAYOUTS:
+            known_sizes = ", ".join(str(k) for k in sorted(INTAN_LAYOUTS))
+            raise ValueError(f"No Intan layout for {pin_count} channels. Known sizes: {known_sizes}")
+        return INTAN_LAYOUTS[pin_count]
 
-    def probeOmnetics2_intan64ch(self):
-        """
-        Maps the channel indices of a 64-channel Omnetics probe to the corresponding channel indices of a 64-channel Intan headstage.
+    def _validate_lengths(self) -> None:
+        if len(self.channel_map) != len(self.omnetics_layout.pins):
+            raise ValueError(
+                "channel_map length must match Omnetics layout length"
+                f" ({len(self.channel_map)} vs {len(self.omnetics_layout.pins)})"
+            )
+        if sum(self.chan_per_shank) != len(self.channel_map):
+            raise ValueError(
+                "chan_per_shank must sum to the total number of channels"
+            )
 
-        Returns:
-            A string representing the device map.
-        """
-        # Create a dictionary that maps each channel on the Omnetics probe to its index
-        probe_index = {value: index for index, value in enumerate(self.probe64ch_omnetics)}
+    def _validate_versions(self) -> None:
+        if len(self.versions) != 2 or any(not v for v in self.versions):
+            raise ValueError("versions must be a pair of non-empty strings")
 
-        # Map the channel indices of the Omnetics probe to the corresponding channel indices of the Intan headstage
-        device_channel_indices1 = self.map_channel_indices(self.channel_map, probe_index, self.intan64ch_preamp)
-        device_channel_indices2 = self.map_channel_indices(self.channel_map, probe_index, self.intan64ch_preamp_flipped)
+    def _map_channel_indices(self, intan_preamp: Sequence[int]) -> List[int]:
+        probe_index = {value: index for index, value in enumerate(self.omnetics_layout.pins)}
+        return [intan_preamp[probe_index[ch]] for ch in self.channel_map]
 
-        if self.save:
-            # Save the device map file for the regular version
-            with open(f'{self.basepath}/{self.probe_type}_{self.probe_name}_version1.txt', 'w') as f:
-                start = 0
-                for i in range(self.num_shanks):
-                    end = start + self.chan_per_shank[i]
-                    f.write('shank{}: '.format(i+1))
-                    f.write(' '.join([str(j) for j in device_channel_indices1[start:end]]) + '\n')
-                    start = end 
+    def _save_mapping(self, mapped: Sequence[int], *, suffix: str) -> Path:
+        path = self.basepath / f"{self.probe_type}_{self.probe_name}_{suffix}.txt"
+        lines = self._format_lines(mapped)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(lines))
+        return path
+
+    def _format_lines(self, mapped: Sequence[int]) -> List[str]:
+        lines: List[str] = []
+        start = 0
+        for shank_idx, count in enumerate(self.chan_per_shank, start=1):
+            end = start + count
+            lines.append(f"shank{shank_idx}: {' '.join(str(v) for v in mapped[start:end])}")
+            start = end
+        return lines
+
+    def _format_report(self, mapped: Sequence[int], flipped: Sequence[int]) -> str:
+        version_a, version_b = self.versions
+        report_lines = [f"Contents of {self.probe_type}_{self.probe_name}_{version_a}.txt:"]
+        report_lines.extend(self._format_lines(mapped))
+        report_lines.append("")
+        report_lines.append(f"Contents of {self.probe_type}_{self.probe_name}_{version_b}.txt:")
+        report_lines.extend(self._format_lines(flipped))
+        return "\n".join(report_lines)
 
 
-            # Save the device map file for the flipped version
-            with open(f'{self.basepath}/{self.probe_type}_{self.probe_name}_version2.txt', 'w') as f:
-                start = 0
-                for i in range(self.num_shanks):
-                    end = start + self.chan_per_shank[i]
-                    f.write('shank{}: '.format(i+1))
-                    f.write(' '.join([str(j) for j in device_channel_indices2[start:end]]) + '\n')
-                    start = end 
+__all__ = ["ProbeMapper", "Layout", "INTAN_LAYOUTS", "OMNETICS_LAYOUTS"]
 
-        # Return the device map as a string
-        device_map = f"Contents of {self.probe_type}_{self.probe_name}_version1.txt:\n"
-        for i in range(self.num_shanks):
-            start = sum(self.chan_per_shank[:i])
-            end = start + self.chan_per_shank[i]
-            device_map += f"shank{i+1}: {' '.join([str(j) for j in device_channel_indices1[start:end]])}\n"
-
-        device_map += f"\nContents of {self.probe_type}_{self.probe_name}_version2.txt:\n"
-        for i in range(self.num_shanks):
-            start = sum(self.chan_per_shank[:i])
-            end = start + self.chan_per_shank[i]
-            device_map += f"shank{i+1}: {' '.join([str(j) for j in device_channel_indices2[start:end]])}\n"
-
-        print(device_map, end=" ")
-
-    def get_device_map(self):
-        """
-        Returns the device map as a string in the format:
-        Contents of <probe_type>_<probe_name>_version1.txt:
-        shank1: <channel_indices>
-        shank2: <channel_indices>
-        ...
-        Contents of <probe_type>_<probe_name>_version2.txt:
-        shank1: <channel_indices>
-        shank2: <channel_indices>
-        ...
-
-        Returns:
-            A string representing the device map.
-        """
-        # Call the probeOmnetics2_intan32ch or probeOmnetics2_intan64ch method to get the device map
-        if len(self.probe32ch_omnetics) > 0:
-            device_map = self.probeOmnetics2_intan32ch()
-        elif len(self.probe64ch_omnetics) > 0:
-            device_map = self.probeOmnetics2_intan64ch()
-        else:
-            device_map = ""
-
-        return device_map
-
-    @staticmethod
-    def map_channel_indices(channel_map, probe_index, intan_preamp):
-        """
-        Maps the channel indices of the Omnetics probe to the corresponding channel indices of the Intan headstage.
-
-        Args:
-            channel_map (list): A list of integers representing the channel indices of the Omnetics probe.
-            probe_index (dict): A dictionary that maps each channel on the Omnetics probe to its index.
-            intan_preamp (list): A list representing the layout of the Intan headstage.
-
-        Returns:
-            A list of integers representing the mapped channel indices of the Intan headstage.
-        """                        
-        return [intan_preamp[probe_index[channel_map[i]]] for i in range(len(channel_map))]
 
