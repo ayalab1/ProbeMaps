@@ -76,6 +76,19 @@ class Layout:
 
         return list(reversed(self.pins))
 
+    def row_flipped(self, row_size: int = 16) -> List[int]:
+        """Return layout with each row of `row_size` channels reversed.
+        
+        This is useful when the Intan headstage is physically flipped,
+        which reverses each row of pins independently.
+        """
+        pins = list(self.pins)
+        result = []
+        for i in range(0, len(pins), row_size):
+            row = pins[i:i + row_size]
+            result.extend(reversed(row))
+        return result
+
 
 @dataclass
 class NeuroscopeParams:
@@ -214,6 +227,9 @@ class ProbeMapper:
     version_suffixes:
         Suffixes for the two output files: normal and flipped orientations.
         Default ("version1", "version2").
+    flip_intan:
+        If True, flip each row of 16 channels in the Intan layout. Use this
+        when the headstage is physically mounted in the opposite orientation.
     """
 
     def __init__(
@@ -229,6 +245,7 @@ class ProbeMapper:
         export_xml: bool = True,
         xml_params: NeuroscopeParams | None = None,
         version_suffixes: Sequence[str] = ("version1", "version2"),
+        flip_intan: bool = False,
     ) -> None:
         self.channel_map = list(channel_map)
         self.chan_per_shank = list(chan_per_shank)
@@ -240,6 +257,7 @@ class ProbeMapper:
         self.export_xml = export_xml
         self.xml_params = xml_params or NeuroscopeParams()
         self.version_suffixes = list(version_suffixes)
+        self.flip_intan = flip_intan
 
         self.omnetics_layout = self._require_omnetics_layout()
         self.intan_layout = self._require_intan_layout()
@@ -252,8 +270,16 @@ class ProbeMapper:
     def compute(self) -> None:
         """Compute regular and flipped mappings, optionally write files, print report."""
 
-        device_channel_indices = self._map_channel_indices(self.intan_layout.pins)
-        flipped_channel_indices = self._map_channel_indices(self.intan_layout.flipped)
+        # Use row-flipped Intan layout if flip_intan is True
+        if self.flip_intan:
+            intan_pins = self.intan_layout.row_flipped(row_size=16)
+            intan_flipped = list(reversed(intan_pins))
+        else:
+            intan_pins = self.intan_layout.pins
+            intan_flipped = self.intan_layout.flipped
+
+        device_channel_indices = self._map_channel_indices(intan_pins)
+        flipped_channel_indices = self._map_channel_indices(intan_flipped)
 
         version_a, version_b = self.version_suffixes
 
